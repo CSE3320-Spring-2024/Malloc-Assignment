@@ -82,15 +82,15 @@ struct _block *findFreeBlock(struct _block **last, size_t size)
 #endif
 
 #if defined BEST && BEST == 0
-   printf("TODO: Implement best fit here\n");
+   /*TODO: Implement best fit here*/
 #endif
 
 #if defined WORST && WORST == 0
-   printf("TODO: Implement worst fit here\n");
+   /*TODO: Implement worst fit here*/
 #endif
 
 #if defined NEXT && NEXT == 0
-   printf("TODO: Implement next fit here\n");
+   /*TODO: Implement next fit here*/
 #endif
 
    return curr;
