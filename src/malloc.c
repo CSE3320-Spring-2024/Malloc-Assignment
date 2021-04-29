@@ -82,15 +82,15 @@ struct _block *findFreeBlock(struct _block **last, size_t size)
 #endif
 
 #if defined BEST && BEST == 0
-   /** TODO: Implement best fit here */
+   /** \todo Implement best fit here */
 #endif
 
 #if defined WORST && WORST == 0
-   /** TODO: Implement worst fit here */
+   /** \todo Implement worst fit here */
 #endif
 
 #if defined NEXT && NEXT == 0
-   /** TODO: Implement next fit here */
+   /** \todo Implement next fit here */
 #endif
 
    return curr;
