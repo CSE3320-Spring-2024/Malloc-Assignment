@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 #define ALIGN4(s)         (((((s) - 1) >> 2) << 2) + 4)
 #define BLOCK_DATA(b)     ((b) + 1)
@@ -51,6 +52,7 @@ struct _block
    struct _block *next;  /* Pointer to the next _block of allocated memory  */
    bool   free;          /* Is this _block free?                            */
    char   padding[3];    /* Padding: IENTRTMzMjAgU3jMDEED                   */
+   
 };
 
 
@@ -92,19 +94,56 @@ struct _block *findFreeBlock(struct _block **last, size_t size)
 // \TODO Put your Best Fit code in this #ifdef block
 #if defined BEST && BEST == 0
    /** \TODO Implement best fit here */
+   struct _block *best_fit = NULL;
+   while (curr) 
+   {
+      if (curr->free && curr->size >= size) 
+      {
+         if (best_fit == NULL || curr->size < best_fit->size) 
+         {
+            best_fit = curr;
+         }
+      }
+      *last = curr;
+      curr = curr->next;
+   }
+   curr = best_fit;
 #endif
 
 // \TODO Put your Worst Fit code in this #ifdef block
 #if defined WORST && WORST == 0
-   /** \TODO Implement worst fit here */
+   struct _block *worst_fit = NULL;
+   while (curr) 
+   {
+      if (curr->free && curr->size >= size) 
+      {
+         if (worst_fit == NULL || curr->size > worst_fit->size) 
+         {
+            worst_fit = curr;
+         }
+      }
+      *last = curr;
+      curr = curr->next;
+   }
+   curr = worst_fit;
 #endif
 
 // \TODO Put your Next Fit code in this #ifdef block
 #if defined NEXT && NEXT == 0
    /** \TODO Implement next fit here */
-#endif
+   if (*last != NULL) {
+       curr = *last;
+       curr = curr->next;
+   } 
 
-   return curr;
+   while(curr && !(curr->free && curr->size >= size)) {
+           *last = curr; 
+           curr = curr->next;
+       }
+       
+   
+    #endif
+       return curr;
 }
 
 /*
@@ -194,19 +233,46 @@ void *malloc(size_t size)
             If the leftover space in the new block is greater than the sizeof(_block)+4 then
             split the block.
             If the leftover space in the new block is less than the sizeof(_block)+4 then
-            don't split the block.
+            don't split the block.      
    */
+   num_mallocs++;
+   num_requested+=size;
+
+   if(next != NULL)
+    {
+      if((next->size - size) > sizeof(struct _block))
+      {
+        num_splits++;
+        num_blocks++;
+        int old_size = next->size;
+        struct _block* oldnext = next->next;
+
+        uint8_t* ptr = (uint8_t*) next;
+        next->next = (struct _block*)(ptr + size + sizeof(struct _block));
+        next->next->free = 1;
+        next->next->size = old_size - size - sizeof(struct _block);
+
+        next->next->next = oldnext;
+      }
+    }
 
    /* Could not find free _block, so grow heap */
    if (next == NULL) 
    {
       next = growHeap(last, size);
+      num_grows++;
+      num_blocks++;
+      max_heap+=size;
    }
 
    /* Could not find free _block or grow heap, so just return NULL */
    if (next == NULL) 
    {
       return NULL;
+   }
+   else
+   {
+     num_reuses++;
    }
    
    /* Mark _block as in use */
@@ -241,21 +307,61 @@ void free(void *ptr)
    /* TODO: Coalesce free _blocks.  If the next block or previous block 
             are free then combine them with this block being freed.
    */
+   num_frees++;
+   while(curr && curr->next)
+   {
+     if(curr->free && curr->next->free )
+     {
+       num_coalesces++;
+       num_blocks--;
+       curr->size = curr->size + curr->next->size + sizeof(struct _block);
+
+       if(curr->next->next)
+       {
+         curr->next = curr->next->next;
+       }
+
+       else
+       {
+         curr->next = NULL;
+       }
+     }
+     curr = curr->next;
+   }
 }
 
 void *calloc( size_t nmemb, size_t size )
 {
-   // \TODO Implement calloc
-   return NULL;
+    size_t total_size = nmemb * size;
+    
+    // Allocate memory using malloc
+    void *ptr = malloc(total_size);
+    if (ptr != NULL) 
+    {
+        // Set the allocated memory to zero
+        memset(ptr, 0, total_size);
+    }
+    return ptr;
 }
 
 void *realloc( void *ptr, size_t size )
 {
    // \TODO Implement realloc
-   return NULL;
+  void *new_ptr = malloc(size);
+  if (new_ptr != NULL){
+   memcpy(new_ptr, ptr, BLOCK_HEADER(ptr)->size);
+   }
+   free(ptr);
+   return new_ptr;
+            
 }
 
 
 
 /* vim: IENTRTMzMjAgU3ByaW5nIDIwMjM= -----------------------------------------*/
 /* vim: set expandtab sts=3 sw=3 ts=6 ft=cpp: --------------------------------*/
+ 
+
+
+
+
