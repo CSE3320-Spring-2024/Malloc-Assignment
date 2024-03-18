@@ -92,16 +92,63 @@ struct _block *findFreeBlock(struct _block **last, size_t size)
 // \TODO Put your Best Fit code in this #ifdef block
 #if defined BEST && BEST == 0
    /** \TODO Implement best fit here */
+   struct _block* bfBlock = NULL;
+   struct _block* bfPrev = NULL;
+   size_t bfSize = SIZE_MAX; // Initialize to maximum possible size
+
+   while(curr) {
+      if(curr->free && curr->size >= size && curr->size < bfSize) {
+         bfBlock = curr;
+         bfPrev = *last;
+         bfSize = curr->size;
+      }
+      *last = curr;
+      curr = curr->next;
+   }
+
+   if(bfBlock) {
+      *last = bfPrev;
+      curr = bfBlock;
+   }
 #endif
 
 // \TODO Put your Worst Fit code in this #ifdef block
 #if defined WORST && WORST == 0
    /** \TODO Implement worst fit here */
+   struct _block* wfBlock = NULL;
+   struct _block* wfPrev = NULL;
+   size_t wfSize = 0; // Initialize to 0
+
+   while(curr) {
+      if (curr->free && curr->size >= size && curr->size > wfSize) {
+         wfBlock = curr;
+         wfPrev = *last;
+         wfSize = curr->size;
+      }
+      *last = curr;
+      curr = curr->next;
+   }
+
+   if(wfBlock) {
+      *last = wfPrev;
+      curr = wfBlock;
+   }
 #endif
 
 // \TODO Put your Next Fit code in this #ifdef block
 #if defined NEXT && NEXT == 0
    /** \TODO Implement next fit here */
+   static struct _block* nfBlock = NULL;
+   if(nfBlock == NULL) {
+      nfBlock = heapList;
+   }
+
+   while(nfBlock && !(nfBlock->free && nfBlock->size >= size)) {
+      *last = nfBlock;
+      nfBlock = nfBlock->next;
+   }
+
+   curr = nfBlock;
 #endif
 
    return curr;
@@ -196,11 +243,29 @@ void *malloc(size_t size)
             If the leftover space in the new block is less than the sizeof(_block)+4 then
             don't split the block.
    */
+   if(next != NULL && (next->size > size + sizeof(struct _block) + 4) && (next->size - (size + sizeof(struct _block)) > sizeof(struct _block) + 4)) {
+      struct _block* splitBlock = (struct _block*)((char*)next + size + sizeof(struct _block));
+      splitBlock->size = next->size - size - sizeof(struct _block);
+      splitBlock->next = next->next;
+      splitBlock->free = true;
+
+      next->size = size;
+      next->next = splitBlock;
+
+      num_splits++;
+   }
 
    /* Could not find free _block, so grow heap */
    if (next == NULL) 
    {
       next = growHeap(last, size);
+      if(next != NULL) {
+         num_grows++;
+         num_blocks++;
+         max_heap += size;
+      }
+   } else {
+      num_reuses++;
    }
 
    /* Could not find free _block or grow heap, so just return NULL */
@@ -211,6 +276,9 @@ void *malloc(size_t size)
    
    /* Mark _block as in use */
    next->free = false;
+
+   num_mallocs++;
+   num_requested += size;
 
    /* Return data address associated with _block to the user */
    return BLOCK_DATA(next);
@@ -241,18 +309,46 @@ void free(void *ptr)
    /* TODO: Coalesce free _blocks.  If the next block or previous block 
             are free then combine them with this block being freed.
    */
+   while (curr->next && curr->next->free) {
+      curr->size += curr->next->size + sizeof(struct _block);
+      curr->next = curr->next->next;
+      num_coalesces++;
+   }
+
+   num_frees++;   
 }
 
 void *calloc( size_t nmemb, size_t size )
 {
    // \TODO Implement calloc
-   return NULL;
+   void* ptr = malloc(nmemb * size);
+   if(ptr != NULL) {
+      memset(ptr, 0, nmemb * size);
+   }
+   return ptr;
 }
 
 void *realloc( void *ptr, size_t size )
 {
    // \TODO Implement realloc
-   return NULL;
+   struct _block* head = BLOCK_HEADER(ptr);
+   size_t prev_size = head->size - sizeof(struct _block);
+   void* nptr = malloc(size);
+   if(!ptr) {
+      return malloc(size);
+   }
+   if(size == 0) {
+      free(ptr);
+      return NULL;
+   }
+   if(size <= prev_size) {
+      return ptr;
+   }
+   if(nptr != NULL) {
+      memcpy(nptr, ptr, prev_size);
+      free(ptr);
+   }
+   return nptr;
 }
 
 
